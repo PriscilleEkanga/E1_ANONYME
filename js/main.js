@@ -1,9 +1,3 @@
-/* ==========================================================================
-   WebCraft Solutions — script unique (index.html + inscription.html)
-   jQuery pour le DOM / les événements, Bootstrap pour les modals,
-   fetch() + async/await pour les appels aux API.
-   ========================================================================== */
-
 'use strict';
 
 /* ---------- 1. Configuration ---------- */
@@ -24,11 +18,7 @@ const PLACEHOLDER_IMG = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent
 
 /* ---------- 2. Utilitaires ---------- */
 
-/**
- * Cache mémoire des réponses API : chaque URL n'est demandée qu'une seule fois
- * (pas de requêtes redondantes). On stocke la promesse pour mutualiser
- * aussi les appels simultanés.
- */
+
 const apiCache = new Map();
 
 /**
@@ -116,6 +106,114 @@ const showApiError = ($container, label, onRetry) => {
   });
 };
 
+/* ---------- Animations (déclenchées en JS, animées en CSS) ---------- */
+
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Apparition au scroll : les éléments .reveal reçoivent .is-visible
+ * lorsqu'ils entrent dans l'écran (une seule fois).
+ */
+const revealObserver = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries, observer) => {
+    entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.12 })
+  : null;
+
+const observeReveal = ($scope) => {
+  $scope.find('.reveal:not(.is-visible)').each((_, el) => {
+    // Navigateur sans IntersectionObserver : on affiche directement
+    if (revealObserver) revealObserver.observe(el);
+    else el.classList.add('is-visible');
+  });
+};
+
+/** Pluie de confettis roses (message de succès du formulaire). */
+const launchConfetti = (count = 70) => {
+  if (prefersReducedMotion()) return;
+
+  const colors = ['#c2477a', '#f9a8c4', '#d8c7f5', '#ffb4a2', '#8e5bc7', '#ffffff'];
+  const $container = $('<div class="confetti" aria-hidden="true"></div>').appendTo('body');
+
+  const pieces = Array.from({ length: count }, () => {
+    const size = 6 + Math.random() * 8;
+    return $('<span class="confetti-piece"></span>').css({
+      left: `${Math.random() * 100}%`,
+      width: `${size}px`,
+      height: `${size * 0.45}px`,
+      background: colors[Math.floor(Math.random() * colors.length)],
+      animationDelay: `${Math.random() * 0.6}s`,
+      animationDuration: `${2.2 + Math.random() * 1.6}s`,
+      '--drift': `${(Math.random() - 0.5) * 220}px`,
+      '--spin': `${360 + Math.random() * 720}deg`
+    });
+  });
+
+  $container.append(pieces);
+  setTimeout(() => $container.remove(), 4500);
+};
+
+/** Affiche des cartes « squelette » (shimmer) pendant le chargement d'une API. */
+const renderSkeletons = ($grid, count = 3) => {
+  const skeleton = `
+    <div class="col-12 col-md-6 col-lg-4" aria-hidden="true">
+      <div class="skeleton-card">
+        <div class="skeleton skeleton-img"></div>
+        <div class="skeleton-body">
+          <div class="skeleton skeleton-line skeleton-title"></div>
+          <div class="skeleton skeleton-line skeleton-short"></div>
+          <div class="skeleton-badges">
+            <span class="skeleton skeleton-badge"></span>
+            <span class="skeleton skeleton-badge"></span>
+            <span class="skeleton skeleton-badge"></span>
+          </div>
+          <div class="skeleton skeleton-btn"></div>
+        </div>
+      </div>
+    </div>`;
+  $grid.html(skeleton.repeat(count));
+};
+
+/**
+ * Cartes 3D : la carte s'incline selon la position de la souris.
+ * Activé seulement avec une souris (pas sur écran tactile) et sans réduction des animations.
+ */
+const MAX_TILT = 8; // degrés
+
+const initCardTilt = ($grids) => {
+  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!canHover || prefersReducedMotion()) return;
+
+  let frame = null;
+
+  $grids
+    .on('mousemove', '.wc-card', function onTiltMove(e) {
+      const card = this;
+      const { left, top, width, height } = card.getBoundingClientRect();
+      // Position de la souris dans la carte, de 0 à 1
+      const x = (e.clientX - left) / width;
+      const y = (e.clientY - top) / height;
+
+      // requestAnimationFrame : une seule mise à jour par image (fluide et économe)
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        card.classList.add('is-tilting');
+        card.style.setProperty('--rx', `${(0.5 - y) * MAX_TILT * 2}deg`);
+        card.style.setProperty('--ry', `${(x - 0.5) * MAX_TILT * 2}deg`);
+        card.style.setProperty('--mx', `${x * 100}%`);
+        card.style.setProperty('--my', `${y * 100}%`);
+      });
+    })
+    .on('mouseleave', '.wc-card', function onTiltLeave() {
+      cancelAnimationFrame(frame);
+      this.classList.remove('is-tilting');
+      ['--rx', '--ry', '--mx', '--my'].forEach((prop) => this.style.removeProperty(prop));
+    });
+};
+
 /** Remplace une image cassée par l'image de remplacement. */
 const handleBrokenImages = ($scope) => {
   $scope.find('img').on('error', function onImgError() {
@@ -134,8 +232,8 @@ const state = {
 
 /* ---------- 3.1 Projets ---------- */
 
-const renderProjectCard = (project) => `
-  <div class="col-12 col-md-6 col-lg-4">
+const renderProjectCard = (project, index) => `
+  <div class="col-12 col-md-6 col-lg-4 reveal" style="--i: ${index % 3}">
     <article class="card wc-card" aria-labelledby="projet-${project.id}-titre">
       <div class="wc-card-img-wrapper">
         <img class="wc-card-img" src="${escapeHTML(project.image)}" alt="Aperçu du projet ${escapeHTML(project.title)}" loading="lazy">
@@ -177,6 +275,7 @@ const renderProjects = () => {
     : '<div class="col-12"><p class="empty-state">Aucun projet ne correspond à vos critères.</p></div>');
 
   handleBrokenImages($grid);
+  observeReveal($grid);
   $('#projets-compteur').text(`${results.length} projet${results.length > 1 ? 's' : ''} sur ${state.projects.length}`);
 };
 
@@ -211,6 +310,7 @@ const openProjectModal = (id) => {
 const loadProjects = async () => {
   const $loader = $('#projets-loader');
   toggleLoader($loader, true);
+  renderSkeletons($('#projets-grille'));
 
   try {
     const data = await fetchJSON(API.projects);
@@ -225,6 +325,7 @@ const loadProjects = async () => {
   } catch (error) {
     console.error('API projets :', error);
     $('#projets-compteur').text('');
+    $('#projets-grille').empty();
     showApiError($('#projets-erreur'), 'les projets', loadProjects);
   } finally {
     toggleLoader($loader, false);
@@ -233,8 +334,8 @@ const loadProjects = async () => {
 
 /* ---------- 3.2 Formations ---------- */
 
-const renderCourseCard = (course) => `
-  <div class="col-12 col-md-6 col-lg-4">
+const renderCourseCard = (course, index) => `
+  <div class="col-12 col-md-6 col-lg-4 reveal" style="--i: ${index % 3}">
     <article class="card wc-card" aria-labelledby="formation-${course.id}-titre">
       <div class="wc-card-img-wrapper">
         <img class="wc-card-img" src="${escapeHTML(course.image)}" alt="Illustration de la formation ${escapeHTML(course.title)}" loading="lazy">
@@ -293,6 +394,7 @@ const renderCourses = () => {
     : '<div class="col-12"><p class="empty-state">Aucune formation ne correspond à vos critères.</p></div>');
 
   handleBrokenImages($grid);
+  observeReveal($grid);
   $('#formations-compteur').text(`${results.length} formation${results.length > 1 ? 's' : ''} sur ${state.courses.length}`);
 };
 
@@ -347,6 +449,7 @@ const openCourseModal = (id) => {
 const loadCourses = async () => {
   const $loader = $('#formations-loader');
   toggleLoader($loader, true);
+  renderSkeletons($('#formations-grille'));
 
   try {
     const data = await fetchJSON(API.courses);
@@ -363,15 +466,59 @@ const loadCourses = async () => {
   } catch (error) {
     console.error('API formations :', error);
     $('#formations-compteur').text('');
+    $('#formations-grille').empty();
     showApiError($('#formations-erreur'), 'les formations', loadCourses);
   } finally {
     toggleLoader($loader, false);
   }
 };
 
-/* ---------- 3.3 Initialisation de la page d'accueil ---------- */
+/* ---------- 3.3 Hero : effet machine à écrire ---------- */
+
+const HERO_WORDS = ['de demain', 'sur mesure', 'qui vous ressemble', 'qui inspire'];
+
+/** Pause asynchrone (utilisée avec await). */
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Écrit puis efface chaque mot en boucle dans $target.
+ * Le texte initial du HTML ("de demain") reste affiché si JS est désactivé.
+ */
+const startTypewriter = async ($target, words, { typeSpeed = 90, eraseSpeed = 45, hold = 1800 } = {}) => {
+  // Les lecteurs d'écran lisent un titre fixe, pas les lettres qui changent
+  $target.closest('h1').attr('aria-label', `Nous concevons le web ${words[0]}`);
+  $target.attr('aria-hidden', 'true');
+  $('<span class="typing-cursor" aria-hidden="true">|</span>').insertAfter($target);
+
+  if (prefersReducedMotion()) return;
+
+  let index = 0;
+  // Boucle infinie : écrire → pause → effacer → mot suivant
+  while (true) {
+    const word = words[index];
+
+    for (let i = $target.text().length; i <= word.length; i += 1) {
+      $target.text(word.slice(0, i));
+      await wait(typeSpeed);
+    }
+    await wait(hold);
+
+    for (let i = word.length; i >= 0; i -= 1) {
+      $target.text(word.slice(0, i));
+      await wait(eraseSpeed);
+    }
+    await wait(300);
+
+    index = (index + 1) % words.length;
+  }
+};
+
+/* ---------- 3.4 Initialisation de la page d'accueil ---------- */
 
 const initHomePage = () => {
+  startTypewriter($('.hero-title .text-gradient'), HERO_WORDS);
+  initCardTilt($('#projets-grille, #formations-grille'));
+
   // Filtres désactivés tant que les données ne sont pas chargées
   $('#projets-filtres, #formations-filtres').find('input, select').prop('disabled', true);
 
@@ -597,6 +744,7 @@ const initRegistrationPage = () => {
       + `Une confirmation sera envoyée à ${formData.email.trim()}.`
     );
     bootstrap.Modal.getOrCreateInstance('#modal-succes').show();
+    launchConfetti();
 
     $form[0].reset();
   });
@@ -614,8 +762,15 @@ const initRegistrationPage = () => {
 /* ==========================================================================
    5. Démarrage : on détecte la page courante
    ========================================================================== */
+// Classe "js" : les éléments .reveal ne sont masqués que si JavaScript fonctionne
+document.documentElement.classList.add('js');
+
 $(() => {
   $('.current-year').text(new Date().getFullYear());
+
+  // Apparition au scroll des blocs statiques
+  $('.section-header, .filters, .results-bar, .form-card').addClass('reveal');
+  observeReveal($(document));
 
   if ($('#projets-grille').length) initHomePage();
   if ($('#form-inscription').length) initRegistrationPage();

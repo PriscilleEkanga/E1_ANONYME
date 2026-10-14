@@ -14,12 +14,27 @@
   <!-- Lien d'évitement pour la navigation clavier -->
   <a class="visually-hidden-focusable skip-link" href="#contenu">Aller au contenu principal</a>
 
-  <!-- ========== HEADER / NAVIGATION ========== -->
+  <!-- ======== HEADER / NAVIGATION ======== -->
   <header class="site-header sticky-top">
     <nav class="navbar navbar-expand-md navbar-light" aria-label="Navigation principale">
       <div class="container">
         <a class="navbar-brand logo" href="index.html" aria-label="WebCraft Solutions, retour à l'accueil">
-          <span class="logo-mark" aria-hidden="true">&lt;/&gt;</span> WebCraft <span class="logo-accent">Solutions</span>
+          <!-- Logo : « W » sur fond dégradé + étincelle -->
+          <svg class="logo-mark" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true" focusable="false">
+            <defs>
+              <linearGradient id="logo-degrade" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#c2477a"/>
+                <stop offset="1" stop-color="#8e5bc7"/>
+              </linearGradient>
+            </defs>
+            <rect width="40" height="40" rx="11" fill="url(#logo-degrade)"/>
+            <path d="M8 14 L13.5 28 L19 18 L24.5 28 L30 14" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="logo-sparkle" d="M32 3.5 L33.2 6.8 L36.5 8 L33.2 9.2 L32 12.5 L30.8 9.2 L27.5 8 L30.8 6.8 Z" fill="#ffe1ec"/>
+          </svg>
+          <span class="logo-text">
+            <span class="logo-name">Web<span class="logo-accent">Craft</span></span>
+            <span class="logo-tagline">Solutions</span>
+          </span>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu-principal"
                 aria-controls="menu-principal" aria-expanded="false" aria-label="Ouvrir le menu">
